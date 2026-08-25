@@ -10,17 +10,28 @@ from telebot.types import (
 from flask import Flask
 
 # ═══════════════════════════════════════════════════════════
-#  DUMMY WEB SERVER សម្រាប់ RENDER (ការពារកុំឱ្យ RENDER SLEEP)
+#  FLASK SERVER & AUTO SELF-PING (FREE 24/7 WITHOUT UPTIMEROBOT)
 # ═══════════════════════════════════════════════════════════
 web_app = Flask(__name__)
 
 @web_app.route('/')
 def home():
-    return "Bot is running 24/7 online!"
+    return "Bot is running 24/7 for FREE!"
 
 def run_web():
     port = int(os.environ.get("PORT", 8080))
     web_app.run(host="0.0.0.0", port=port)
+
+def self_ping_forever():
+    """ផ្ញើសំណើដាស់ Render ស្វ័យប្រវត្តិរៀងរាល់ 8 នាទីម្តង ដើម្បីកុំឱ្យ Render Sleep"""
+    time.sleep(30)
+    render_url = "https://the-top-up.onrender.com"
+    while True:
+        try:
+            http_req.get(render_url, timeout=10)
+        except:
+            pass
+        time.sleep(480) # 8 នាទី
 
 logging.basicConfig(format="%(asctime)s [%(levelname)s] %(message)s", level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -42,9 +53,6 @@ MERCHANT_CITY      = "Phnom Penh"
 DEPOSIT_EXPIRE_SEC = 600
 POLL_INTERVAL      = 3
 
-# ═══════════════════════════════════════════════════════════
-#  HIGH-SPEED THREADING & HTTP SESSION POOL
-# ═══════════════════════════════════════════════════════════
 executor = ThreadPoolExecutor(max_workers=30)
 http_session = http_req.Session()
 adapter = http_req.adapters.HTTPAdapter(pool_connections=50, pool_maxsize=50)
@@ -53,9 +61,6 @@ http_session.mount("http://", adapter)
 
 bot = telebot.TeleBot(BOT_TOKEN, parse_mode=None, threaded=True, num_threads=30)
 
-# ═══════════════════════════════════════════════════════════
-#  FILES & DATABASE
-# ═══════════════════════════════════════════════════════════
 USERS_FILE      = "store_users.json"
 GAMES_FILE      = "store_games.json"
 ORDERS_FILE     = "store_orders.json"
@@ -135,21 +140,15 @@ game_catalog = _load(GAMES_FILE, {
 game_orders  = _load(ORDERS_FILE, {})
 waiting      = {}
 
-# ═══════════════════════════════════════════════════════════
-#  HELPERS & API ENGINE
-# ═══════════════════════════════════════════════════════════
-def is_admin(uid):
-    return int(uid) in ADMIN_IDS
+def is_admin(uid): return int(uid) in ADMIN_IDS
 
 def _notify_admins(msg, reply_markup=None):
     for aid in ADMIN_IDS:
         executor.submit(lambda a=aid: _safe_send_admin(a, msg, reply_markup))
 
 def _safe_send_admin(aid, msg, reply_markup=None):
-    try:
-        bot.send_message(aid, msg, parse_mode="HTML", reply_markup=reply_markup)
-    except Exception as e:
-        logger.warning(f"Admin send error to {aid}: {e}")
+    try: bot.send_message(aid, msg, parse_mode="HTML", reply_markup=reply_markup)
+    except Exception as e: logger.warning(f"Admin send error to {aid}: {e}")
 
 def _safe_send_group(msg):
     try: bot.send_message(GROUP_CHAT_ID, msg, parse_mode="HTML")
@@ -194,9 +193,7 @@ def _execute_real_topup(player_id, product_id):
     key = api_cfg.get("api_key", "").strip()
     provider = api_cfg.get("provider", "smileone")
 
-    if not url or not key:
-        return False, "មិនទាន់កំណត់ API Key"
-
+    if not url or not key: return False, "មិនទាន់កំណត់ API Key"
     try:
         if provider == "smileone":
             sign_str = f"uid={m_id}&product_id={product_id}&userid={player_id}&key={key}"
@@ -204,22 +201,16 @@ def _execute_real_topup(player_id, product_id):
             payload = {"uid": m_id, "userid": player_id, "product_id": product_id, "sign": sign}
             r = http_session.post(url, data=payload, timeout=12)
             res = r.json()
-            if res.get("status") == 200:
-                return True, str(res.get("order_id", "SUCCESS"))
+            if res.get("status") == 200: return True, str(res.get("order_id", "SUCCESS"))
             return False, res.get("message", "API Error")
         else:
             payload = {"merchant_id": m_id, "api_key": key, "player_id": player_id, "product_id": product_id}
             r = http_session.post(url, json=payload, timeout=12)
             res = r.json()
-            if res.get("status") in [200, "success", "SUCCESS", 1]:
-                return True, str(res.get("order_id", res.get("id", "SUCCESS")))
+            if res.get("status") in [200, "success", "SUCCESS", 1]: return True, str(res.get("order_id", res.get("id", "SUCCESS")))
             return False, res.get("message", res.get("error", "API Error"))
-    except Exception as e:
-        return False, str(e)
+    except Exception as e: return False, str(e)
 
-# ═══════════════════════════════════════════════════════════
-#  KEYBOARDS
-# ═══════════════════════════════════════════════════════════
 def main_kb():
     kb = ReplyKeyboardMarkup(resize_keyboard=True, row_width=2)
     kb.row("🛍️ ហាងទំនិញ & សេវាកម្ម (Shop)")
@@ -244,8 +235,7 @@ def games_menu_kb(prefix="user_game"):
     btns, row = [], []
     for gid, ginfo in game_catalog.items():
         row.append(InlineKeyboardButton(f"{ginfo['name']}", callback_data=f"{prefix}:{gid}"))
-        if len(row) == 2:
-            btns.append(row); row = []
+        if len(row) == 2: btns.append(row); row = []
     if row: btns.append(row)
     return InlineKeyboardMarkup(btns)
 
@@ -263,9 +253,6 @@ def game_packages_kb(gid, is_admin_panel=False):
     btns.append([InlineKeyboardButton("🔙 ថយក្រោយ (Back)", callback_data="back_games")])
     return InlineKeyboardMarkup(btns)
 
-# ═══════════════════════════════════════════════════════════
-#  HIGH-SPEED KHQR & APPROVAL ENGINE
-# ═══════════════════════════════════════════════════════════
 def _create_khqr_card_image(qr_str, merchant_name, amount):
     try:
         r = http_session.post(
@@ -362,15 +349,13 @@ def _watch_order_payment(oid, md5_hash, sent_msg_id, uid, amount, pkg_name, play
 
     while time.time() < expire_time:
         order = game_orders.get(oid)
-        if not order or order.get("status") not in ("pending_payment",):
-            return
+        if not order or order.get("status") not in ("pending_payment",): return
 
         if _check_bakong(md5_hash):
             try: bot.delete_message(uid, sent_msg_id)
             except: pass
             _process_paid_order(oid)
             return
-
         time.sleep(POLL_INTERVAL)
 
     order = game_orders.get(oid)
@@ -471,9 +456,6 @@ def _send_order_qr(uid, player_id, pkg, game_name):
 
     executor.submit(_watch_order_payment, oid, md5_hash, sent_msg.message_id, uid, amount, pkg_name, player_id, game_name)
 
-# ═══════════════════════════════════════════════════════════
-#  MAIN BOT HANDLERS
-# ═══════════════════════════════════════════════════════════
 @bot.message_handler(commands=["start", "admin"])
 def cmd_start(message):
     uid = message.chat.id
@@ -690,25 +672,18 @@ def handle_msg(message):
 
     bot.send_message(uid, "❓ សូមប្រើប្រាស់ Menu ខាងក្រោម៖", reply_markup=main_kb())
 
-# ═══════════════════════════════════════════════════════════
-#  INSTANT CALLBACK QUERIES & ADMIN APPROVAL
-# ═══════════════════════════════════════════════════════════
 @bot.callback_query_handler(func=lambda c: True)
 def handle_cb(call):
     uid = call.message.chat.id
     data = call.data
     bot.answer_callback_query(call.id)
 
-    # 1. Admin ចុច "បញ្ជាក់ (Approve)"
     if data.startswith("adm_appr:"):
         if not is_admin(uid): return
         oid = data.split(":")[1]
         order = game_orders.get(oid)
-        if not order:
-            bot.send_message(uid, "❌ មិនមានទិន្នន័យ Order នេះទេ!"); return
-
-        if order.get("status") == "✅ completed":
-            bot.send_message(uid, f"⚠️ Order <code>{oid}</code> ត្រូវបានបញ្ជាក់រួចរាល់ហើយ!", parse_mode="HTML"); return
+        if not order: bot.send_message(uid, "❌ មិនមានទិន្នន័យ Order នេះទេ!"); return
+        if order.get("status") == "✅ completed": bot.send_message(uid, f"⚠️ Order <code>{oid}</code> ត្រូវបានបញ្ជាក់រួចរាល់ហើយ!", parse_mode="HTML"); return
 
         target_uid = int(order["uid"])
         player_id = order["player_id"]
@@ -753,7 +728,6 @@ def handle_cb(call):
         executor.submit(lambda: _safe_send_group(group_appr_msg))
         return
 
-    # 2. Admin ចុច "បោះបង់ (Reject)"
     if data.startswith("adm_rej:"):
         if not is_admin(uid): return
         oid = data.split(":")[1]
@@ -764,10 +738,7 @@ def handle_cb(call):
         _async_save(ORDERS_FILE, game_orders)
 
         try:
-            bot.edit_message_text(
-                f"❌ <b>Order <code>{oid}</code> ត្រូវបានបោះបង់ (Rejected) ដោយ Admin!</b>",
-                chat_id=uid, message_id=call.message.message_id, parse_mode="HTML"
-            )
+            bot.edit_message_text(f"❌ <b>Order <code>{oid}</code> ត្រូវបានបោះបង់ (Rejected) ដោយ Admin!</b>", chat_id=uid, message_id=call.message.message_id, parse_mode="HTML")
         except: pass
 
         target_uid = int(order["uid"])
@@ -790,7 +761,6 @@ def handle_cb(call):
         executor.submit(lambda: _safe_send_group(group_rej_msg))
         return
 
-    # 3. User & Admin Navigation
     if data.startswith("user_game:"):
         gid = data.split(":")[1]
         ginfo = game_catalog.get(gid)
@@ -857,20 +827,13 @@ def handle_cb(call):
     if data.startswith("chk_order:"):
         oid = data.split(":")[1]
         order = game_orders.get(oid)
-        if not order:
-            bot.send_message(uid, "❌ មិនមានវិក្កយបត្រនេះទេ!"); return
-
-        if _check_bakong(order.get("md5", "")):
-            _process_paid_order(oid)
-        else:
-            bot.send_message(uid, "⏳ <b>មិនទាន់ឃើញប្រតិបត្តិការបង់ប្រាក់នៅឡើយទេ!</b>", parse_mode="HTML")
+        if not order: bot.send_message(uid, "❌ មិនមានវិក្កយបត្រនេះទេ!"); return
+        if _check_bakong(order.get("md5", "")): _process_paid_order(oid)
+        else: bot.send_message(uid, "⏳ <b>មិនទាន់ឃើញប្រតិបត្តិការបង់ប្រាក់នៅឡើយទេ!</b>", parse_mode="HTML")
         return
 
-# ═══════════════════════════════════════════════════════════
-#  RUN (BOT + WEB SERVER FOR RENDER 24/7)
-# ═══════════════════════════════════════════════════════════
 if __name__ == "__main__":
-    # បើកដំណើរការ Web Server ក្នុង Thread មួយទៀតដើម្បីកុំឱ្យ Render Sleep
     threading.Thread(target=run_web, daemon=True).start()
-    logger.info("⚡ Advanced User Tracking Multi-Admin Store Bot is running 24/7...")
+    threading.Thread(target=self_ping_forever, daemon=True).start()
+    logger.info("⚡ Self-Ping 24/7 Multi-Admin Store Bot is running...")
     bot.infinity_polling(timeout=20, long_polling_timeout=15)
