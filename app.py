@@ -7,6 +7,20 @@ from telebot.types import (
     ReplyKeyboardMarkup, KeyboardButton,
     InlineKeyboardMarkup, InlineKeyboardButton
 )
+from flask import Flask
+
+# ═══════════════════════════════════════════════════════════
+#  DUMMY WEB SERVER សម្រាប់ RENDER (ការពារកុំឱ្យ RENDER SLEEP)
+# ═══════════════════════════════════════════════════════════
+web_app = Flask(__name__)
+
+@web_app.route('/')
+def home():
+    return "Bot is running 24/7 online!"
+
+def run_web():
+    port = int(os.environ.get("PORT", 8080))
+    web_app.run(host="0.0.0.0", port=port)
 
 logging.basicConfig(format="%(asctime)s [%(levelname)s] %(message)s", level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -15,10 +29,7 @@ logger = logging.getLogger(__name__)
 #  CONFIG
 # ═══════════════════════════════════════════════════════════
 BOT_TOKEN          = "8860717390:AAE3Ai8LiP5aRXCfJfIfmowvY68ym-ySXUQ"
-
-# Admin IDs ទាំង ២ នាក់
 ADMIN_IDS          = [8807182741, 8202228991]
-
 BOT_USERNAME       = "KhmerSmm005_bot"
 ADMIN_USERNAME     = "@XGK_ganin"
 GROUP_CHAT_ID      = -1003942724736
@@ -145,7 +156,6 @@ def _safe_send_group(msg):
     except Exception as e: logger.warning(f"Group send error: {e}")
 
 def _track_user_and_alert(message):
-    """កត់ត្រាអ្នកប្រើប្រាស់ និងផ្ញើសារ Alert ទៅ Admin និង Group ពេលមានអ្នកចុច /start ថ្មី"""
     uid = message.chat.id
     uid_str = str(uid)
     u = message.from_user
@@ -163,7 +173,6 @@ def _track_user_and_alert(message):
     }
     _async_save(USERS_FILE, users_db)
 
-    # ជូនដំណឹងពេលមានសមាជិកថ្មីចុចចូល Bot លើកដំបូង
     if is_new_user and not is_admin(uid):
         time_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         join_alert = (
@@ -858,8 +867,10 @@ def handle_cb(call):
         return
 
 # ═══════════════════════════════════════════════════════════
-#  RUN
+#  RUN (BOT + WEB SERVER FOR RENDER 24/7)
 # ═══════════════════════════════════════════════════════════
 if __name__ == "__main__":
-    logger.info("⚡ Advanced User Tracking Multi-Admin Store Bot is running...")
+    # បើកដំណើរការ Web Server ក្នុង Thread មួយទៀតដើម្បីកុំឱ្យ Render Sleep
+    threading.Thread(target=run_web, daemon=True).start()
+    logger.info("⚡ Advanced User Tracking Multi-Admin Store Bot is running 24/7...")
     bot.infinity_polling(timeout=20, long_polling_timeout=15)
