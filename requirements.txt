@@ -3,3 +3,4 @@ requests
 pillow
 qrcode
 bakong-khqr
+flask
